@@ -1,6 +1,6 @@
 # Prossa
 
-Prossa is a library for checking data processing techniques applicable on a dataset.
+Prossa is a python library for checking data processing techniques applicable on a dataset.
 
 ## Installation
 
