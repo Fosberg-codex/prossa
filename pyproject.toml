@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prossa"
+version = "1.1.0"
+description = "A library for checking data processing techniques applicable on a dataset"
+readme = "README.md"
+authors = [{ name = "Fosberg Addai", email = "your.fosberg1addai@gmail.com" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+keywords = ["data", "analysis", "preprocessing", "Machine Learning"]
+dependencies = [
+    "pandas",
+    "numpy",
+    "scipy",
+]
+requires-python = ">=3.7"
+
+[project.optional-dependencies]
+dev = ["pytest", "pip-tools", "bumpver"]
+test = ["pytest", "pip-tools", "bumpver"]
+
+where = ["src"]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/prossa"
+
+[project.scripts]
+prossa = "prossa.__main__:main"
+[tool.bumpver]
+current_version = "2024.1003-alpha"
+version_pattern = "YYYY.BUILD[-TAG]"
+commit_message = "bump version {old_version} -> {new_version}"
+tag_message = "{new_version}"
+tag_scope = "default"
+pre_commit_hook = ""
+post_commit_hook = ""
+commit = true
+tag = true
+push = true
+
+[tool.bumpver.file_patterns]
+"pyproject.toml" = [
+    'current_version = "{version}"',
+]
+"README.md" = [
+    "{version}",
+    "{pep440_version}",
+]
+

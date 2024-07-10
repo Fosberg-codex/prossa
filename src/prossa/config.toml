@@ -1,0 +1,6 @@
+[analysis]
+outlier_threshold = 3
+high_cardinality_threshold = 10
+
+[recommendations]
+max_recommendations = 5

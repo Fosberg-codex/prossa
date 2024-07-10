@@ -1,0 +1,29 @@
+# Virtual environment
+env/
+venv/
+*.venv
+
+# Python byte-compiled files
+__pycache__/
+*.py[cod]
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# PyCharm files
+.idea/
+
+# VS Code files
+.vscode/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Operating system files
+.DS_Store  # macOS
+Thumbs.db  # Windows
+
+# Log files
+*.log
