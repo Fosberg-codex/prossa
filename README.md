@@ -1,10 +1,7 @@
 # Prossa
 
-<<<<<<< HEAD
 Prossa is an open-source library for checking data preprocessing techniques applicable on a dataset.
-=======
-Prossa is a python library for checking data processing techniques applicable on a dataset.
->>>>>>> b16c8da2770bed8b05ce816eef1b52a676d8b301
+
 
 ## Installation
 
