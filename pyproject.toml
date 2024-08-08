@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prossa"
-version = "1.2.0"
+version = "1.4.0"
 description = "An open-source library for checking data preprocessing techniques applicable on a dataset."
 readme = "README.md"
-authors = [{ name = "Fosberg Addai", email = "your.fosberg1addai@gmail.com" }]
+authors = [{ name = "Fosberg Addai", email = "fosberg1addai@gmail.com" }]
 license = { file = "LICENSE" }
 classifiers = [
     "License :: OSI Approved :: MIT License",

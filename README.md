@@ -30,8 +30,8 @@ df = pd.read_csv('your_dataset.csv')
 # Analyze the dataset
 analyze_dataset(df)
 ```
-#### To enhance your data preprocessing flow with Prossa, please refer to the documentation.
-[Docs](https://prossa.pages.dev/)
+#### Documentation.
+To enhance your data preprocessing flow with Prossa, please refer to the documentation: [Docs](https://prossa.pages.dev/)
 
 ## Contributing
 
