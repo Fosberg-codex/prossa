@@ -31,7 +31,7 @@ df = pd.read_csv('your_dataset.csv')
 analyze_dataset(df)
 ```
 #### Documentation.
-To enhance your data preprocessing flow with Prossa, please refer to the documentation: [Docs](https://prossa.pages.dev/)
+To enhance your data preprocessing flow with Prossa, please refer to the documentation: [Docs](https://prossa.vercel.app/)
 
 ## Contributing
 
