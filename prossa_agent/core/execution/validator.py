@@ -6,141 +6,230 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
 import logging
-import torch
-import torch.nn.functional as F
+import pandas as pd
+import numpy as np
 from sentence_transformers import SentenceTransformer
+import torch
+from ...utils.errors import ValidationError, handle_preprocessing_error
 
 @dataclass
 class ValidationResult:
-    """Result of validation process"""
+    """Comprehensive validation results"""
     confidence_score: float
-    context_relevance: float
-    response_consistency: float
+    data_quality: Dict[str, float]
+    preprocessing_quality: Dict[str, float]
     metadata: Dict[str, Any]
     timestamp: datetime
+    
+    @property
+    def passed(self) -> bool:
+        """Check if validation passed minimum thresholds"""
+        return (
+            self.confidence_score >= 0.7 and
+            all(score >= 0.5 for score in self.data_quality.values()) and
+            all(score >= 0.5 for score in self.preprocessing_quality.values())
+        )
 
 class ValidationEngine:
-    """
-    Handles validation focused on RAG operations:
-    - Context relevance checking
-    - Response-context consistency
-    - Basic quality checks
-    """
+    """Validates preprocessing results and data quality"""
     
-    def __init__(self, 
-                 embedding_model: str = 'all-MiniLM-L6-v2',
-                 use_gpu: bool = True):
+    def __init__(self, use_gpu: bool = True):
         self.device = 'cuda' if use_gpu and torch.cuda.is_available() else 'cpu'
         self._setup_logging()
-        self._initialize_components(embedding_model)
-
+        self._initialize_components()
+        
     def _setup_logging(self):
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    def _initialize_components(self, embedding_model: str):
+    def _initialize_components(self):
         try:
-            self.encoder = SentenceTransformer(embedding_model, device=self.device)
-            self.logger.info(f"Initialized validation engine with {embedding_model} on {self.device}")
+            # Initialize semantic similarity model for text comparison
+            self.encoder = SentenceTransformer('all-MiniLM-L6-v2', device=self.device)
+            self.logger.info("Validation engine initialized successfully")
         except Exception as e:
-            self.logger.error(f"Failed to initialize validation components: {str(e)}")
+            self.logger.error(f"Failed to initialize validation engine: {str(e)}")
             raise
 
-    async def validate(self,
-                      response: str,
-                      context: List[str],
-                      query: str) -> ValidationResult:
-        """
-        Validate response against context and query.
-        
-        Args:
-            response: Generated response
-            context: Retrieved context
-            query: Original query
-            
-        Returns:
-            ValidationResult containing validation metrics
-        """
+    async def validate_preprocessing(self, 
+                                  original_df: pd.DataFrame,
+                                  processed_df: pd.DataFrame,
+                                  preprocessing_plan: Dict[str, Any]) -> ValidationResult:
+        """Comprehensive validation of preprocessing results"""
         try:
-            # Generate embeddings
-            response_embedding = self._generate_embedding(response)
-            context_embeddings = self._generate_embeddings(context)
-            query_embedding = self._generate_embedding(query)
+            # Validate data quality
+            data_quality = self._validate_data_quality(original_df, processed_df)
             
-            # Calculate metrics
-            context_relevance = self._calculate_context_relevance(
-                query_embedding, context_embeddings
-            )
-            
-            response_consistency = self._calculate_response_consistency(
-                response_embedding, context_embeddings
+            # Validate preprocessing steps
+            preprocessing_quality = self._validate_preprocessing_steps(
+                processed_df, 
+                preprocessing_plan
             )
             
             # Calculate overall confidence
             confidence = self._calculate_confidence(
-                context_relevance,
-                response_consistency
+                data_quality,
+                preprocessing_quality
             )
             
-            return ValidationResult(
+            result = ValidationResult(
                 confidence_score=confidence,
-                context_relevance=context_relevance,
-                response_consistency=response_consistency,
-                metadata=self._create_metadata(len(context)),
+                data_quality=data_quality,
+                preprocessing_quality=preprocessing_quality,
+                metadata={
+                    "original_shape": original_df.shape,
+                    "processed_shape": processed_df.shape,
+                    "plan_steps": preprocessing_plan.get('applied_steps', [])
+                },
                 timestamp=datetime.now()
             )
             
+            if not result.passed:
+                raise ValidationError(
+                    "Validation failed to meet minimum thresholds",
+                    {
+                        'confidence': confidence,
+                        'data_quality': data_quality,
+                        'preprocessing_quality': preprocessing_quality
+                    }
+                )
+            
+            return result
+            
         except Exception as e:
-            self.logger.error(f"Validation error: {str(e)}")
+            error_context = {
+                'original_shape': original_df.shape,
+                'processed_shape': processed_df.shape
+            }
+            if isinstance(e, ValidationError):
+                raise
+            raise handle_preprocessing_error(e, error_context)
+
+    def _validate_data_quality(self, 
+                             original_df: pd.DataFrame, 
+                             processed_df: pd.DataFrame) -> Dict[str, float]:
+        """Validate data quality metrics"""
+        try:
+            return {
+                'completeness': self._calculate_completeness(processed_df),
+                'consistency': self._calculate_consistency(original_df, processed_df),
+                'validity': self._validate_data_types(processed_df),
+                'integrity': self._check_data_integrity(processed_df)
+            }
+        except Exception as e:
+            self.logger.error(f"Data quality validation error: {str(e)}")
             raise
 
-    def _generate_embedding(self, text: str) -> torch.Tensor:
-        """Generate embedding for single text"""
-        with torch.no_grad():
-            return self.encoder.encode(
-                text,
-                convert_to_tensor=True,
-                show_progress_bar=False
-            ).to(self.device)
+    def _validate_preprocessing_steps(self,
+                                   df: pd.DataFrame,
+                                   plan: Dict[str, Any]) -> Dict[str, float]:
+        """Validate preprocessing step execution"""
+        try:
+            results = {}
+            applied_steps = plan.get('applied_steps', [])
+            
+            if 'missing_values' in applied_steps:
+                results['missing_values'] = 1.0 if df.isnull().sum().sum() == 0 else 0.0
+                
+            if 'scaling' in applied_steps:
+                results['scaling'] = self._validate_scaling(df)
+                
+            if 'categorical_encoding' in applied_steps:
+                results['encoding'] = self._validate_encoding(df)
+                
+            if 'outliers' in applied_steps:
+                results['outliers'] = self._validate_outliers(df)
+                
+            return results
+            
+        except Exception as e:
+            self.logger.error(f"Preprocessing validation error: {str(e)}")
+            raise
 
-    def _generate_embeddings(self, texts: List[str]) -> torch.Tensor:
-        """Generate embeddings for multiple texts"""
-        with torch.no_grad():
-            return self.encoder.encode(
-                texts,
-                convert_to_tensor=True,
-                show_progress_bar=False
-            ).to(self.device)
+    def _calculate_completeness(self, df: pd.DataFrame) -> float:
+        """Calculate data completeness score"""
+        total_cells = df.size
+        missing_cells = df.isnull().sum().sum()
+        return 1.0 - (missing_cells / total_cells)
 
-    def _calculate_context_relevance(self,
-                                   query_embedding: torch.Tensor,
-                                   context_embeddings: torch.Tensor) -> float:
-        """Calculate relevance of context to query"""
-        similarities = F.cosine_similarity(
-            query_embedding.unsqueeze(0),
-            context_embeddings
+    def _calculate_consistency(self, 
+                             original_df: pd.DataFrame, 
+                             processed_df: pd.DataFrame) -> float:
+        """Calculate data consistency score"""
+        if len(processed_df) != len(original_df):
+            return 0.0
+            
+        consistent_cols = sum(
+            1 for col in processed_df.columns
+            if col in original_df.columns
         )
-        return float(torch.mean(similarities).cpu())
+        return consistent_cols / len(original_df.columns)
 
-    def _calculate_response_consistency(self,
-                                     response_embedding: torch.Tensor,
-                                     context_embeddings: torch.Tensor) -> float:
-        """Calculate consistency of response with context"""
-        similarities = F.cosine_similarity(
-            response_embedding.unsqueeze(0),
-            context_embeddings
-        )
-        return float(torch.mean(similarities).cpu())
+    def _validate_data_types(self, df: pd.DataFrame) -> float:
+        """Validate data types"""
+        valid_types = 0
+        for dtype in df.dtypes:
+            if dtype in ['int64', 'float64', 'object', 'bool', 'datetime64[ns]']:
+                valid_types += 1
+        return valid_types / len(df.dtypes)
+
+    def _check_data_integrity(self, df: pd.DataFrame) -> float:
+        """Check data integrity"""
+        try:
+            integrity_checks = [
+                df.index.is_unique,
+                not df.empty,
+                all(col.strip() == col for col in df.columns),  # Clean column names
+                all(df[col].notna().any() for col in df.columns)  # No empty columns
+            ]
+            return sum(1 for check in integrity_checks if check) / len(integrity_checks)
+        except Exception:
+            return 0.0
+
+    def _validate_scaling(self, df: pd.DataFrame) -> float:
+        """Validate numerical scaling"""
+        numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns
+        if len(numerical_cols) == 0:
+            return 1.0
+            
+        scaled_cols = 0
+        for col in numerical_cols:
+            stats = df[col].describe()
+            if -3 <= stats['mean'] <= 3 and 0 <= stats['std'] <= 2:
+                scaled_cols += 1
+                
+        return scaled_cols / len(numerical_cols)
+
+    def _validate_encoding(self, df: pd.DataFrame) -> float:
+        """Validate categorical encoding"""
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        if len(categorical_cols) == 0:
+            return 1.0
+            
+        return 0.0 if len(categorical_cols) > 0 else 1.0
+
+    def _validate_outliers(self, df: pd.DataFrame) -> float:
+        """Validate outlier removal"""
+        numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns
+        if len(numerical_cols) == 0:
+            return 1.0
+            
+        outlier_free_cols = 0
+        for col in numerical_cols:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            outliers = df[col][(df[col] < Q1 - 1.5 * IQR) | (df[col] > Q3 + 1.5 * IQR)]
+            if len(outliers) / len(df) < 0.01:  # Less than 1% outliers
+                outlier_free_cols += 1
+                
+        return outlier_free_cols / len(numerical_cols)
 
     def _calculate_confidence(self,
-                            context_relevance: float,
-                            response_consistency: float) -> float:
+                            data_quality: Dict[str, float],
+                            preprocessing_quality: Dict[str, float]) -> float:
         """Calculate overall confidence score"""
-        return (context_relevance + response_consistency) / 2.0
-
-    def _create_metadata(self, context_count: int) -> Dict[str, Any]:
-        """Create metadata for validation result"""
-        return {
-            "context_count": context_count,
-            "validation_device": self.device,
-            "timestamp": datetime.now().isoformat()
-        }
+        quality_score = sum(data_quality.values()) / len(data_quality)
+        preprocessing_score = sum(preprocessing_quality.values()) / len(preprocessing_quality)
+        
+        # Weight quality higher than preprocessing
+        return 0.7 * quality_score + 0.3 * preprocessing_score

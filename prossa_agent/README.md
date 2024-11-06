@@ -51,7 +51,7 @@ GOOGLE_GEMINI_API_KEY=your_gemini_key
 Basic usage example:
 
 ```python
-from prossa_agent.core.prosa_agent import ProsaAgent, AgentConfig
+from prossa_agent.core.prossa_agent import ProsaAgent, AgentConfig
 
 # Initialize agent
 config = AgentConfig(

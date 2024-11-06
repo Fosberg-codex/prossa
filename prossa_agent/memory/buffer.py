@@ -1,30 +1,25 @@
 """
-Memory buffer implementation focused on RAG vector storage and retrieval.
+Memory buffer focused on RAG operations for dataset processing.
 """
 
-from typing import Dict, Any, List, Optional
-from datetime import datetime
-import logging
-import torch
-from sentence_transformers import SentenceTransformer
+from typing import List, Dict, Any, Optional
 import numpy as np
+import torch
+from datetime import datetime
+from sentence_transformers import SentenceTransformer
+import logging
 from dataclasses import dataclass
 
 @dataclass
 class MemoryEntry:
-    """A single memory entry"""
+    """Single memory entry with embeddings"""
     content: str
     embedding: np.ndarray
     metadata: Dict[str, Any]
     timestamp: datetime
 
 class MemoryBuffer:
-    """
-    Memory buffer focused on RAG operations:
-    - Vector storage for context
-    - Efficient retrieval
-    - Basic cleanup
-    """
+    """Memory buffer for storing and retrieving processing context"""
     
     def __init__(self, 
                  max_items: int = 1000,
@@ -73,63 +68,62 @@ class MemoryBuffer:
             self.logger.error(f"Failed to add interaction: {str(e)}")
             return False
 
-    async def search_similar(self, 
-                           query: str,
-                           limit: int = 5,
-                           threshold: float = 0.7) -> List[Dict[str, Any]]:
-        """Search for similar memories"""
+    async def get_relevant_context(self, 
+                                 query: str, 
+                                 k: int = 3) -> List[str]:
+        """Retrieve relevant context for a query"""
         try:
             if not self.memories:
                 return []
-            
+                
             query_embedding = await self._generate_embedding(query)
             
-            similarities = []
-            for idx, memory in enumerate(self.memories):
-                similarity = self._calculate_similarity(query_embedding, memory.embedding)
-                if similarity >= threshold:
-                    similarities.append((similarity, idx))
+            # Calculate similarities
+            similarities = [
+                self._cosine_similarity(query_embedding, mem.embedding)
+                for mem in self.memories
+            ]
             
-            similarities.sort(reverse=True)
-            results = []
+            # Get top-k relevant memories
+            top_k_indices = np.argsort(similarities)[-k:][::-1]
             
-            for similarity, idx in similarities[:limit]:
-                memory = self.memories[idx]
-                results.append({
-                    "content": memory.content,
-                    "similarity": float(similarity),
-                    "timestamp": memory.timestamp.isoformat(),
-                    "metadata": memory.metadata
-                })
-            
-            return results
+            return [self.memories[i].content for i in top_k_indices]
             
         except Exception as e:
-            self.logger.error(f"Search error: {str(e)}")
+            self.logger.error(f"Failed to retrieve context: {str(e)}")
             return []
 
     async def _generate_embedding(self, text: str) -> np.ndarray:
         """Generate embedding for text"""
-        with torch.no_grad():
-            return self.encoder.encode(text, convert_to_numpy=True)
-
-    def _calculate_similarity(self, 
-                            embedding1: np.ndarray,
-                            embedding2: np.ndarray) -> float:
-        """Calculate cosine similarity"""
-        return float(np.dot(embedding1, embedding2) / 
-                    (np.linalg.norm(embedding1) * np.linalg.norm(embedding2)))
+        try:
+            with torch.no_grad():
+                embedding = self.encoder.encode(text)
+            return embedding
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate embedding: {str(e)}")
+            raise
 
     def _add_entry(self, entry: MemoryEntry):
-        """Add entry to memory, maintaining size limit"""
-        self.memories.append(entry)
-        self.embeddings.append(entry.embedding)
-        
-        if len(self.memories) > self.max_items:
+        """Add entry to memory buffer"""
+        if len(self.memories) >= self.max_items:
             self.memories.pop(0)
             self.embeddings.pop(0)
+            
+        self.memories.append(entry)
+        self.embeddings.append(entry.embedding)
 
-    def clear(self):
-        """Clear all memories"""
-        self.memories.clear()
-        self.embeddings.clear()
+    def _cosine_similarity(self, a: np.ndarray, b: np.ndarray) -> float:
+        """Calculate cosine similarity between vectors"""
+        return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+    async def get_all_interactions(self) -> List[Dict[str, Any]]:
+        """Get all stored interactions"""
+        return [
+            {
+                'content': mem.content,
+                'metadata': mem.metadata,
+                'timestamp': mem.timestamp
+            }
+            for mem in self.memories
+        ]
