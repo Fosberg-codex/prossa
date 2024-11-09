@@ -3,6 +3,7 @@ Configuration management for the Prossa Agent.
 """
 
 import os
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional
 from dotenv import load_dotenv
@@ -34,7 +35,17 @@ class SystemConfig:
 
 def load_config() -> tuple[APIConfig, SystemConfig]:
     """Load configuration from environment"""
-    load_dotenv()
+    # Get the project root directory
+    project_root = Path(__file__).parent.parent.parent
+    env_path = project_root / '.env'
+    
+    # Load .env file
+    load_dotenv(dotenv_path=env_path)
+    
+    # Debug print to verify key loading
+    gemini_key = os.getenv("GOOGLE_GEMINI_API_KEY")
+    if not gemini_key:
+        print("Warning: GOOGLE_GEMINI_API_KEY not found in environment")
     
     api_config = APIConfig(
         openai_api_key=os.getenv("OPENAI_API_KEY"),

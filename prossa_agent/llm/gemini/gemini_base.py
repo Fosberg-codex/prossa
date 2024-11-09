@@ -1,5 +1,5 @@
 """
-Gemini Base 1.0 implementation for the Prossa Agent framework.
+Gemini gemini-1.5-flash-8b-001 implementation for the Prossa Agent framework.
 """
 
 import os
@@ -9,9 +9,9 @@ from ..base import BaseLLM, LLMResponse
 from ..prompts.system_prompts import get_system_prompt
 
 class GeminiBase(BaseLLM):
-    """Gemini Base 1.0 implementation"""
+    """gemini-1.5-flash-8b-001 implementation"""
     
-    MODEL_NAME = "gemini-1.0-base"
+    MODEL_NAME = "gemini-1.5-flash-8b-001"
     
     def __init__(self, api_key: Optional[str] = None, system_prompt: Optional[str] = None):
         super().__init__(api_key, system_prompt or get_system_prompt())

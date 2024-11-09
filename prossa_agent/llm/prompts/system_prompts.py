@@ -1,5 +1,6 @@
 """
 System prompts for LLM models in the Prossa Agent framework.
+This will be passed to the LLM as a system prompt.
 """
 
 def get_system_prompt() -> str:

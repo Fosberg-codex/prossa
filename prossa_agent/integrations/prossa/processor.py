@@ -2,13 +2,12 @@
 Core integration between Prossa library and the agent framework.
 """
 
-from typing import Dict, Any, Optional, Union, List
+from typing import Dict, Any, Optional, Union
 import pandas as pd
-import numpy as np
 import logging
 from datetime import datetime
 from dataclasses import dataclass
-from prossa import (
+from src.prossa.analyzer import (
     check_missing_values,
     check_outliers,
     check_data_types,
@@ -20,11 +19,7 @@ from prossa import (
 from ...core.preprocessing.handlers import PreprocessingHandlers
 from ...llm.selector import ModelSelector
 from ...memory.buffer import MemoryBuffer
-from ...utils.errors import (
-    PreprocessingError, 
-    DatasetError,
-    handle_preprocessing_error
-)
+from ...utils.errors import DatasetError, PreprocessingError
 
 @dataclass
 class ProcessingResult:
@@ -36,9 +31,7 @@ class ProcessingResult:
     error: Optional[Dict[str, Any]] = None
 
 class ProsaProcessor:
-    """
-    Core processor integrating Prossa library capabilities with the agent framework.
-    """
+    """Core processor integrating Prossa library capabilities"""
     
     def __init__(self, use_gpu: bool = True):
         self._setup_logging()
@@ -63,17 +56,41 @@ class ProsaProcessor:
         try:
             self._validate_dataset(df)
             
+            # Perform analysis and ensure we get results
+            missing_analysis = check_missing_values(df)
+            outliers_analysis = check_outliers(df)
+            dtypes_analysis = check_data_types(df)
+            scaling_analysis = check_scaling_encoding(df)
+            categorical_analysis = check_categorical_data(df)
+            constant_analysis = check_constant_columns(df)
+            imputation_analysis = check_imputation(df)
+            
             analysis = {
-                'missing_values': check_missing_values(df),
-                'outliers': check_outliers(df),
-                'data_types': check_data_types(df),
-                'scaling_needs': check_scaling_encoding(df),
-                'categorical_data': check_categorical_data(df),
-                'constant_columns': check_constant_columns(df),
-                'imputation_needs': check_imputation(df)
+                'missing_values': {
+                    'has_missing': missing_analysis is not None,
+                    'details': missing_analysis
+                },
+                'outliers': {
+                    'has_outliers': outliers_analysis is not None,
+                    'details': outliers_analysis
+                },
+                'data_types': dtypes_analysis,
+                'scaling_needs': {
+                    'needs_scaling': scaling_analysis is not None,
+                    'details': scaling_analysis
+                },
+                'categorical_data': {
+                    'has_categorical': categorical_analysis is not None,
+                    'details': categorical_analysis
+                },
+                'constant_columns': constant_analysis,
+                'imputation_needs': {
+                    'needs_imputation': imputation_analysis is not None,
+                    'details': imputation_analysis
+                }
             }
 
-            # Store analysis in memory for context
+            # Store analysis in memory
             await self.memory.add_interaction(
                 query="dataset_analysis",
                 response=str(analysis),
@@ -88,14 +105,13 @@ class ProsaProcessor:
 
         except Exception as e:
             error_context = {'dataset_shape': df.shape if isinstance(df, pd.DataFrame) else None}
-            raise handle_preprocessing_error(e, error_context)
+            raise PreprocessingError(f"Analysis failed: {str(e)}", error_context)
 
     async def execute_preprocessing(self, 
                                  df: pd.DataFrame, 
                                  analysis: Dict[str, Any]) -> ProcessingResult:
         """Execute preprocessing based on analysis"""
         try:
-            self._validate_dataset(df)
             processed_df = df.copy()
             
             # Get preprocessing plan from LLM
@@ -106,35 +122,24 @@ class ProsaProcessor:
             
             plan = await self._generate_preprocessing_plan(model, analysis)
             
-            # Track applied transformations
-            applied_steps = []
-            
-            # Execute preprocessing steps with validation
+            # Execute preprocessing steps based on analysis
             if analysis['missing_values']['has_missing']:
                 processed_df = self.handlers._handle_missing_values(processed_df)
-                applied_steps.append('missing_values')
                 
             if analysis['outliers']['has_outliers']:
                 processed_df = self.handlers._handle_outliers(processed_df)
-                applied_steps.append('outliers')
                 
             if analysis['scaling_needs']['needs_scaling']:
                 processed_df = self.handlers._apply_scaling(processed_df)
-                applied_steps.append('scaling')
                 
             if analysis['categorical_data']['has_categorical']:
                 processed_df = self.handlers._encode_categorical(processed_df)
-                applied_steps.append('categorical_encoding')
                 
             return ProcessingResult(
                 success=True,
                 data=processed_df,
                 analysis=analysis,
-                plan={
-                    **plan,
-                    'applied_steps': applied_steps,
-                    'execution_timestamp': datetime.now()
-                }
+                plan=plan
             )
             
         except Exception as e:
@@ -142,8 +147,7 @@ class ProsaProcessor:
                 'dataset_shape': df.shape if isinstance(df, pd.DataFrame) else None,
                 'analysis': analysis
             }
-            error = handle_preprocessing_error(e, error_context)
-            
+            error = PreprocessingError(f"Preprocessing execution failed: {str(e)}", error_context)
             return ProcessingResult(
                 success=False,
                 data=str(error),
@@ -154,26 +158,3 @@ class ProsaProcessor:
                     'timestamp': datetime.now()
                 }
             )
-
-    async def _generate_preprocessing_plan(self, 
-                                        model: Any, 
-                                        analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate preprocessing plan using LLM"""
-        prompt = f"""Based on the following dataset analysis, generate a detailed preprocessing plan:
-        {analysis}
-        
-        Include specific steps for:
-        1. Missing value handling
-        2. Outlier treatment
-        3. Feature scaling
-        4. Encoding categorical variables
-        5. Data type conversions
-        
-        Format the response as a structured plan with clear steps."""
-        
-        response = await model.generate(prompt)
-        return {
-            'steps': response.content,
-            'confidence': response.confidence,
-            'model_used': response.metadata.get('model')
-        }

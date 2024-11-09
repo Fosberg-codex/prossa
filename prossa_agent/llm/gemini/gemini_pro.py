@@ -19,6 +19,28 @@ class GeminiPro(BaseLLM):
         genai.configure(api_key=self.api_key)
         self.model = genai.GenerativeModel('gemini-pro')
 
+    async def generate_content(self, 
+                             prompt: str,
+                             **kwargs) -> str:
+        """Generate content using Gemini Pro"""
+        response = await self.model.generate_content_async(prompt)
+        return response.text
+
+    async def validate_response(self, 
+                              response: str,
+                              context: Optional[Dict[str, Any]] = None) -> bool:
+        """Validate the generated response"""
+        # Basic validation - ensure response is not empty
+        if not response or not response.strip():
+            return False
+            
+        # Check if response seems coherent
+        min_length = 10  # Minimum reasonable response length
+        max_length = 10000  # Maximum reasonable response length
+        response_length = len(response.split())
+        
+        return min_length <= response_length <= max_length
+
     async def generate(self, 
                       query: str, 
                       context: Optional[List[str]] = None,
@@ -31,16 +53,19 @@ class GeminiPro(BaseLLM):
             
             full_prompt = f"{system_prompt}\n\n{user_prompt}"
             
-            response = await self.model.generate_content_async(
+            # Generate content
+            content = await self.generate_content(
                 full_prompt,
-                generation_config={
-                    'max_output_tokens': max_tokens,
-                    'temperature': 0.7
-                }
+                max_tokens=max_tokens
             )
+            
+            # Validate response
+            is_valid = await self.validate_response(content)
+            if not is_valid:
+                raise ValueError("Generated response failed validation")
 
             return LLMResponse(
-                content=response.text,
+                content=content,
                 confidence=0.90,  # Gemini Pro baseline confidence
                 metadata={
                     "model": "gemini-pro",
