@@ -4,8 +4,11 @@ from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 import os
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 class EmbeddingManager:
     def __init__(self, persist_directory: Optional[str] = "./chroma_db"):
@@ -32,14 +35,36 @@ class EmbeddingManager:
                            metadata: Dict[str, Any],
                            id: str) -> None:
         """Store a preprocessing recommendation with metadata"""
-        embeddings = self.embedding_model.encode([content])
+        try:
+            # Clean and convert metadata to acceptable types
+            cleaned_metadata = self._clean_metadata(metadata)
+            
+            embeddings = self.embedding_model.encode([content])
+            
+            self.recommendations.add(
+                embeddings=embeddings.tolist(),
+                documents=[content],
+                metadatas=[cleaned_metadata],
+                ids=[id]
+            )
+        except Exception as e:
+            logger.warning(f"Failed to store recommendation: {str(e)}")
         
-        self.recommendations.add(
-            embeddings=embeddings.tolist(),
-            documents=[content],
-            metadatas=[metadata],
-            ids=[id]
-        )
+    def _clean_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Clean metadata to ensure all values are of acceptable types"""
+        cleaned = {}
+        for key, value in metadata.items():
+            if isinstance(value, (str, int, float, bool)):
+                cleaned[key] = value
+            elif isinstance(value, tuple):
+                cleaned[key] = f"{value[0]}x{value[1]}"  # Convert shape tuple to string
+            elif isinstance(value, dict):
+                cleaned[key] = str(value)  # Convert dict to string
+            elif isinstance(value, list):
+                cleaned[key] = ", ".join(map(str, value))  # Convert list to comma-separated string
+            else:
+                cleaned[key] = str(value)  # Convert any other type to string
+        return cleaned
     
     def store_dataset_pattern(self,
                             pattern: str,

@@ -172,16 +172,44 @@ class Agent:
                              dataset_id: str,
                              metadata: Dict[str, Any]) -> None:
         """Store recommendations in vector database"""
-        for rec in recommendations:
-            self.embedding_manager.store_recommendation(
-                content=str(rec["recommendation"]),
-                metadata={
+        try:
+            for rec in recommendations:
+                # Convert recommendation to string format
+                content = self._format_recommendation_content(rec["recommendation"])
+                
+                # Clean metadata
+                clean_metadata = {
                     "dataset_id": dataset_id,
                     "type": rec["type"],
-                    **metadata
-                },
-                id=f"{dataset_id}_{rec['type']}_{uuid.uuid4().hex[:8]}"
-            )
+                    "confidence": float(rec["validation"]["confidence_score"]),
+                    "model": str(rec["recommendation"].get("model", "unknown")),
+                    "dataset_type": str(metadata.get("type", "unknown")),
+                    "dataset_size": f"{metadata['shape'][0]}x{metadata['shape'][1]}"
+                }
+                
+                self.embedding_manager.store_recommendation(
+                    content=content,
+                    metadata=clean_metadata,
+                    id=f"{dataset_id}_{rec['type']}_{uuid.uuid4().hex[:8]}"
+                )
+        except Exception as e:
+            self.logger.error(f"Error storing recommendations: {str(e)}")
+            # Continue execution even if storage fails
+            pass
+    
+    def _format_recommendation_content(self, recommendation: Dict[str, Any]) -> str:
+        """Format recommendation content as string"""
+        content = recommendation.get("content", {})
+        if isinstance(content, dict):
+            # Format structured content
+            parts = []
+            for key, value in content.items():
+                if value:  # Only include non-empty values
+                    parts.append(f"{key.replace('_', ' ').title()}: {value}")
+            return "\n\n".join(parts)
+        else:
+            # Return content as is if it's already a string
+            return str(content)
     
     def _generate_report(self,
                         recommendations: List[Dict[str, Any]],
@@ -228,27 +256,33 @@ class Agent:
                 dataset_complexity=metadata["complexity"]
             )
             
+            # Ensure we have a proper content structure
+            content = response.get("content", {})
+            if isinstance(content, str):
+                content = {"text": content}
+            
             return {
                 "id": uuid.uuid4().hex,
                 "type": task_type.value,
-                "content": {  # Structured content for validation
-                    "statistical_summary": response.get("content", {}).get("statistical_summary", ""),
-                    "data_quality": response.get("content", {}).get("data_quality", ""),
-                    "recommendations": response.get("content", {}).get("recommendations", ""),
-                    "features": response.get("content", {}).get("features", ""),
-                    "transformations": response.get("content", {}).get("transformations", ""),
-                    "impact": response.get("content", {}).get("impact", ""),
-                    "method": response.get("content", {}).get("method", ""),
-                    "threshold": response.get("content", {}).get("threshold", ""),
-                    "identified_outliers": response.get("content", {}).get("identified_outliers", ""),
-                    "strategy": response.get("content", {}).get("strategy", ""),
-                    "affected_columns": response.get("content", {}).get("affected_columns", ""),
-                    "justification": response.get("content", {}).get("justification", ""),
-                    "parameters": response.get("content", {}).get("parameters", ""),
-                    "categorical_columns": response.get("content", {}).get("categorical_columns", ""),
-                    "encoding_map": response.get("content", {}).get("encoding_map", "")
+                "content": {
+                    "statistical_summary": content.get("statistical_summary", ""),
+                    "data_quality": content.get("data_quality", ""),
+                    "recommendations": content.get("recommendations", ""),
+                    "features": content.get("features", ""),
+                    "transformations": content.get("transformations", ""),
+                    "impact": content.get("impact", ""),
+                    "method": content.get("method", ""),
+                    "threshold": content.get("threshold", ""),
+                    "identified_outliers": content.get("identified_outliers", ""),
+                    "strategy": content.get("strategy", ""),
+                    "affected_columns": content.get("affected_columns", ""),
+                    "justification": content.get("justification", ""),
+                    "parameters": content.get("parameters", ""),
+                    "categorical_columns": content.get("categorical_columns", ""),
+                    "encoding_map": content.get("encoding_map", ""),
+                    "text": content.get("text", str(content))  # Fallback to full content
                 },
-                "model": response["model"],
+                "model": response.get("model", "unknown"),
                 "timestamp": datetime.utcnow().isoformat()
             }
             
@@ -257,10 +291,12 @@ class Agent:
             return {
                 "id": uuid.uuid4().hex,
                 "type": task_type.value,
-                "content": {},  # Empty content for failed recommendations
+                "content": {
+                    "text": f"Error generating recommendation: {str(e)}",
+                    "error": str(e)
+                },
                 "model": None,
-                "timestamp": datetime.utcnow().isoformat(),
-                "error": str(e)
+                "timestamp": datetime.utcnow().isoformat()
             }
     
     def _create_screening_prompt(self,

@@ -218,10 +218,39 @@ class LLMManager:
                              prompt: str,
                              **kwargs) -> Dict[str, Any]:
         """Process task with Google's Gemini"""
-        model = genai.GenerativeModel(model)
-        response = model.generate_content(prompt)
+        model_instance = genai.GenerativeModel(model)
+        response = model_instance.generate_content(prompt)
+        
+        # Structure the response properly
         return {
-            "content": response.text,
+            "content": {
+                "text": response.text,
+                "statistical_summary": self._extract_section(response.text, "statistical_summary"),
+                "data_quality": self._extract_section(response.text, "data_quality"),
+                "recommendations": self._extract_section(response.text, "recommendations"),
+                "features": self._extract_section(response.text, "features"),
+                "transformations": self._extract_section(response.text, "transformations"),
+                "impact": self._extract_section(response.text, "impact"),
+                "method": self._extract_section(response.text, "method"),
+                "threshold": self._extract_section(response.text, "threshold"),
+                "identified_outliers": self._extract_section(response.text, "identified_outliers"),
+                "strategy": self._extract_section(response.text, "strategy"),
+                "affected_columns": self._extract_section(response.text, "affected_columns"),
+                "justification": self._extract_section(response.text, "justification"),
+                "parameters": self._extract_section(response.text, "parameters"),
+                "categorical_columns": self._extract_section(response.text, "categorical_columns"),
+                "encoding_map": self._extract_section(response.text, "encoding_map")
+            },
             "model": model,
-            "usage": None  # Gemini doesn't provide usage stats
-        } 
+            "usage": None
+        }
+    
+    def _extract_section(self, text: str, section: str) -> str:
+        """Extract specific sections from the response text"""
+        try:
+            # Simple extraction - can be made more sophisticated
+            if section.lower() in text.lower():
+                return text
+            return ""
+        except:
+            return ""
