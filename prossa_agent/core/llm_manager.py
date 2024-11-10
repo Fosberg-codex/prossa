@@ -14,6 +14,10 @@ class ModelType(Enum):
     VALIDATION = "validation"
     FEATURE_ENGINEERING = "feature_engineering"
     INITIAL_SCREENING = "initial_screening"
+    OUTLIER_DETECTION = "outlier_detection"
+    MISSING_VALUES = "missing_values"
+    SCALING = "scaling"
+    ENCODING = "encoding"
 
 class LLMManager:
     def __init__(self):
@@ -21,6 +25,7 @@ class LLMManager:
         self._init_clients()
         self._load_config()
         self.active_models = self._verify_available_models()
+        self.fallback_chain = self._setup_fallback_chain()
     
     def _init_clients(self):
         """Initialize API clients for different LLM providers"""
@@ -46,11 +51,75 @@ class LLMManager:
         with open(config_path, 'r') as file:
             self.config = yaml.safe_load(file)
     
+    def _setup_fallback_chain(self) -> Dict[str, List[str]]:
+        """Setup fallback chain for each model"""
+        return {
+            "claude-3-sonnet": ["gpt-4", "o1-preview", "gemini-1.5-pro", "claude-3-haiku"],
+            "claude-3-haiku": ["claude-3-sonnet", "o1-preview", "gemini-1.5-pro", "gpt-4"],
+            "gpt-4": ["o1-preview", "claude-3-sonnet", "gemini-1.5-pro", "claude-3-haiku"],
+            "o1-preview": ["gpt-4", "claude-3-haiku", "gemini-1.5-pro", "gemini-1.5-flash"],
+            "gemini-1.5-pro": ["o1-preview", "gpt-4", "claude-3-haiku", "gemini-1.5-flash"],
+            "gemini-1.5-flash": ["gemini-1.5-pro", "o1-preview", "claude-3-haiku", "gpt-4"]
+        }
+    
+    async def process_task(self,
+                          task_type: ModelType,
+                          prompt: str,
+                          dataset_complexity: float = 0.5,
+                          **kwargs) -> Dict[str, Any]:
+        """Process a task with the selected model, with fallback handling"""
+        tried_models = set()
+        errors = {}
+        
+        # Get initial model
+        current_model = self.select_model(task_type, dataset_complexity)
+        
+        while current_model not in tried_models:
+            tried_models.add(current_model)
+            
+            try:
+                if "claude" in current_model:
+                    return await self._process_anthropic(current_model, prompt, **kwargs)
+                elif "gpt" in current_model:
+                    return await self._process_openai(current_model, prompt, **kwargs)
+                else:
+                    return await self._process_gemini(current_model, prompt, **kwargs)
+                    
+            except Exception as e:
+                errors[current_model] = str(e)
+                # Get next model from fallback chain
+                current_model = self._get_next_available_model(
+                    current_model,
+                    tried_models
+                )
+        
+        # If we've exhausted all options, raise comprehensive error
+        raise RuntimeError(
+            f"All available models failed. Errors: {errors}"
+        )
+    
+    def _get_next_available_model(self,
+                                current_model: str,
+                                tried_models: set) -> Optional[str]:
+        """Get next available model from fallback chain"""
+        fallback_options = self.fallback_chain.get(current_model, [])
+        
+        for model in fallback_options:
+            if (model not in tried_models and 
+                self.active_models.get(model, False)):
+                return model
+                
+        # If no fallbacks left, try any available model not yet tried
+        all_models = set(self.active_models.keys())
+        available_models = all_models - tried_models
+        
+        return next(iter(available_models)) if available_models else None
+    
     def _verify_available_models(self) -> Dict[str, bool]:
         """Verify which models are available for use"""
         available_models = {}
         
-        # Check Anthropic models
+        # Test Anthropic models
         try:
             self.anthropic_client.messages.create(
                 model="claude-3-haiku-20240307",
@@ -58,10 +127,42 @@ class LLMManager:
                 messages=[{"role": "user", "content": "test"}]
             )
             available_models["claude-3-haiku"] = True
+            available_models["claude-3-sonnet"] = True
         except:
             available_models["claude-3-haiku"] = False
+            available_models["claude-3-sonnet"] = False
+        
+        # Test OpenAI models
+        try:
+            # Test GPT-4
+            self.openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": "test"}],
+                max_tokens=10
+            )
+            available_models["gpt-4"] = True
             
-        # Similar checks for other models...
+            # Test o1-preview
+            self.openai_client.chat.completions.create(
+                model="o1-preview",
+                messages=[{"role": "user", "content": "test"}],
+                max_tokens=10
+            )
+            available_models["o1-preview"] = True
+        except:
+            available_models["gpt-4"] = False
+            available_models["o1-preview"] = False
+        
+        # Test Gemini models
+        try:
+            model = genai.GenerativeModel("gemini-1.5-pro")
+            model.generate_content("test")
+            available_models["gemini-1.5-pro"] = True
+            available_models["gemini-1.5-flash"] = True
+        except:
+            available_models["gemini-1.5-pro"] = False
+            available_models["gemini-1.5-flash"] = False
+        
         return available_models
     
     def select_model(self, 
@@ -79,21 +180,6 @@ class LLMManager:
         
         # Return fallback model if primary not available
         return model_config["fallback"]
-    
-    async def process_task(self,
-                          task_type: ModelType,
-                          prompt: str,
-                          dataset_complexity: float = 0.5,
-                          **kwargs) -> Dict[str, Any]:
-        """Process a task with the selected model"""
-        model_name = self.select_model(task_type, dataset_complexity)
-        
-        if "claude" in model_name:
-            return await self._process_anthropic(model_name, prompt, **kwargs)
-        elif "gpt" in model_name:
-            return await self._process_openai(model_name, prompt, **kwargs)
-        else:
-            return await self._process_gemini(model_name, prompt, **kwargs)
     
     async def _process_anthropic(self,
                                model: str,

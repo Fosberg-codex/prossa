@@ -217,21 +217,51 @@ class Agent:
                                          analysis: Dict[str, Any],
                                          metadata: Dict[str, Any]) -> Dict[str, Any]:
         """Generate recommendation for specific task type"""
-        prompt = self._create_task_prompt(task_type, analysis, metadata)
-        
-        response = await self.llm_manager.process_task(
-            task_type=ModelType[task_type.name],
-            prompt=prompt,
-            dataset_complexity=metadata["complexity"]
-        )
-        
-        return {
-            "id": uuid.uuid4().hex,
-            "type": task_type.value,
-            "content": response["content"],
-            "model": response["model"],
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        try:
+            # Map ValidationType to ModelType
+            model_type = ModelType[task_type.name]
+            prompt = self._create_task_prompt(task_type, analysis, metadata)
+            
+            response = await self.llm_manager.process_task(
+                task_type=model_type,
+                prompt=prompt,
+                dataset_complexity=metadata["complexity"]
+            )
+            
+            return {
+                "id": uuid.uuid4().hex,
+                "type": task_type.value,
+                "content": {  # Structured content for validation
+                    "statistical_summary": response.get("content", {}).get("statistical_summary", ""),
+                    "data_quality": response.get("content", {}).get("data_quality", ""),
+                    "recommendations": response.get("content", {}).get("recommendations", ""),
+                    "features": response.get("content", {}).get("features", ""),
+                    "transformations": response.get("content", {}).get("transformations", ""),
+                    "impact": response.get("content", {}).get("impact", ""),
+                    "method": response.get("content", {}).get("method", ""),
+                    "threshold": response.get("content", {}).get("threshold", ""),
+                    "identified_outliers": response.get("content", {}).get("identified_outliers", ""),
+                    "strategy": response.get("content", {}).get("strategy", ""),
+                    "affected_columns": response.get("content", {}).get("affected_columns", ""),
+                    "justification": response.get("content", {}).get("justification", ""),
+                    "parameters": response.get("content", {}).get("parameters", ""),
+                    "categorical_columns": response.get("content", {}).get("categorical_columns", ""),
+                    "encoding_map": response.get("content", {}).get("encoding_map", "")
+                },
+                "model": response["model"],
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error generating recommendation for {task_type.value}: {str(e)}")
+            return {
+                "id": uuid.uuid4().hex,
+                "type": task_type.value,
+                "content": {},  # Empty content for failed recommendations
+                "model": None,
+                "timestamp": datetime.utcnow().isoformat(),
+                "error": str(e)
+            }
     
     def _create_screening_prompt(self,
                                dataset: pd.DataFrame,

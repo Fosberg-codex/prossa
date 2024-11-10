@@ -4,6 +4,9 @@ model_assignments:
       - name: "claude-3-sonnet-20240229"
         min_complexity: 0.7
         max_complexity: 1.0
+      - name: "o1-preview"
+        min_complexity: 0.4
+        max_complexity: 0.8
       - name: "gpt-4"
         min_complexity: 0.5
         max_complexity: 0.9
@@ -17,6 +20,9 @@ model_assignments:
       - name: "claude-3-sonnet-20240229"
         min_complexity: 0.0
         max_complexity: 1.0
+      - name: "o1-preview"
+        min_complexity: 0.0
+        max_complexity: 0.9
       - name: "gpt-4"
         min_complexity: 0.0
         max_complexity: 1.0
@@ -24,6 +30,9 @@ model_assignments:
 
   feature_engineering:
     models:
+      - name: "o1-preview"
+        min_complexity: 0.0
+        max_complexity: 0.9
       - name: "claude-3-haiku-20240307"
         min_complexity: 0.0
         max_complexity: 0.8
@@ -37,7 +46,53 @@ model_assignments:
       - name: "gemini-1.5-flash"
         min_complexity: 0.0
         max_complexity: 0.5
+      - name: "o1-preview"
+        min_complexity: 0.3
+        max_complexity: 0.7
       - name: "claude-3-haiku-20240307"
         min_complexity: 0.4
         max_complexity: 0.8
-    fallback: "gemini-1.5-pro" 
+    fallback: "gemini-1.5-pro"
+
+  outlier_detection:
+    models:
+      - name: "claude-3-sonnet-20240229"
+        min_complexity: 0.6
+        max_complexity: 1.0
+      - name: "o1-preview"
+        min_complexity: 0.3
+        max_complexity: 0.8
+      - name: "gpt-4"
+        min_complexity: 0.4
+        max_complexity: 0.9
+    fallback: "gemini-1.5-pro"
+
+  missing_values:
+    models:
+      - name: "o1-preview"
+        min_complexity: 0.0
+        max_complexity: 0.8
+      - name: "claude-3-haiku-20240307"
+        min_complexity: 0.3
+        max_complexity: 0.9
+    fallback: "gemini-1.5-pro"
+
+  scaling:
+    models:
+      - name: "gemini-1.5-pro"
+        min_complexity: 0.0
+        max_complexity: 0.7
+      - name: "o1-preview"
+        min_complexity: 0.3
+        max_complexity: 0.8
+    fallback: "claude-3-haiku-20240307"
+
+  encoding:
+    models:
+      - name: "o1-preview"
+        min_complexity: 0.0
+        max_complexity: 0.8
+      - name: "claude-3-haiku-20240307"
+        min_complexity: 0.3
+        max_complexity: 0.9
+    fallback: "gemini-1.5-pro"
