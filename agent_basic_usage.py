@@ -6,7 +6,7 @@ from prossa_agent.utils.reporting import ReportGenerator
 async def main():
     # Create sample dataset
     data = {
-        'age': [25, 30, 35, None, 45, 50, 1000],  # Note: 1000 is likely an outlier
+        'age': [25, 30, 35, None, 45, 50, 1000],
         'income': [30000, 45000, None, 55000, 65000, 75000, 85000],
         'education': ['High School', 'Bachelor', 'Master', 'PhD', 'Bachelor', None, 'High School'],
         'employed': ['Yes', 'Yes', 'No', 'Yes', 'No', 'Yes', 'Yes']

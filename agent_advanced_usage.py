@@ -43,35 +43,16 @@ async def process_dataset(filepath: Path, agent: Agent, report_generator: Report
         logger.error(f"Error processing {filepath}: {str(e)}")
         raise
 
-async def batch_process_datasets(data_directory: str) -> None:
-    """Process multiple datasets in a directory"""
-    data_dir = Path(data_directory)
-    
-    # Initialize components
-    agent = Agent(persist_directory="./prossa_data")
-    report_generator = ReportGenerator(output_directory="./analysis_reports")
-    
-    # Process all CSV files in directory
-    csv_files = list(data_dir.glob("*.csv"))
-    logger.info(f"Found {len(csv_files)} CSV files to process")
-    
-    for filepath in csv_files:
-        await process_dataset(filepath, agent, report_generator)
-
 async def main():
     # Example usage with error handling
     try:
         # Process single dataset
-        logger.info("Processing single dataset example...")
+        logger.info("Processing military dataset example...")
         await process_dataset(
-            Path("data/sample.csv"),
+            Path("dataset/military.csv"),
             Agent(),
             ReportGenerator()
         )
-        
-        # Process multiple datasets
-        logger.info("\nProcessing batch datasets example...")
-        await batch_process_datasets("data/batch_datasets")
         
     except Exception as e:
         logger.error(f"Error in main execution: {str(e)}")

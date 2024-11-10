@@ -26,4 +26,11 @@ build/
 Thumbs.db  # Windows
 
 # Log files
+logs/
 *.log
+
+# reports
+reports/
+
+# generated embeddings
+prossa_data/
