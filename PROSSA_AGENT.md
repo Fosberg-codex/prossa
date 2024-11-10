@@ -24,9 +24,26 @@ These manual features empower Prossa users to handle data preprocessing efficien
 
 ---
 
+### Structure of the Agent
+```
+prossa_agent/
+├── core/
+│   ├── __init__.py
+│   ├── agent.py          # Main Agent class
+│   ├── llm_manager.py    # LLM selection and management
+│   ├── validator.py      # Confidence validation
+│   └── embeddings.py     # Vector DB operations
+├── config/
+│   └── llm_config.yaml   # LLM configurations
+├── utils/
+│   ├── __init__.py
+│   └── reporting.py      # Report generation utilities
+├── requirements.txt
+└── .env                  # API keys and configurations
+```
 ### **Your Role in Prossa’s Development**
 
-As a **contributor to Prossa**, your role centers on evolving the library towards increased automation and efficiency. You’re responsible for enhancing the current capabilities of Prossa by integrating an **LLM-driven AI agent** to automate the identification, recommendation, and execution of preprocessing tasks. This involves creating an agent capable of independently analyzing datasets, generating preprocessing recommendations, and validating these recommendations before presenting them to the user.
+As a **contributor to Prossa**, your role centers on evolving the library towards increased automation and efficiency. You’re responsible for enhancing the current capabilities of Prossa by integrating an **LLM-driven AI agent** to automate the identification, recommendation, and execution of preprocessing tasks. This involves creating an agent capable of independently analyzing datasets, generating preprocessing recommendations, and validating these recommendations before presenting them to the user. This should not be complex at all but very robust and simple contribution.
 
 ### **Your Implementation Responsibilities**
 
@@ -38,7 +55,7 @@ You are in charge of implementing the following components within Prossa:
 
 3. **LLM Analysis and Recommendation Generation**: Enabling the agent to evaluate datasets and generate a set of preprocessing actions.
 
-4. **Embedding Storage and Retrieval**: Storing LLM-generated recommendations as embeddings in a vector database, allowing the agent to "learn" over time for more efficient processing of similar datasets.
+4. **Embedding Storage and Retrieval**: Storing LLM-generated recommendations as embeddings in a vector database, allowing the agent to "learn" over time for more efficient processing of similar datasets. (ChromaDB for Vector DB | Sentence Transformers for Embeddings)
 
 5. **Custom Validation (_confidence_validation)**: Developing and implementing a custom validation algorithm to verify the accuracy of the LLM’s recommendations, ensuring results meet a defined quality threshold before being returned to the user.
 

@@ -1,0 +1,43 @@
+model_assignments:
+  analysis:
+    models:
+      - name: "claude-3-sonnet-20240229"
+        min_complexity: 0.7
+        max_complexity: 1.0
+      - name: "gpt-4"
+        min_complexity: 0.5
+        max_complexity: 0.9
+      - name: "gemini-1.5-pro"
+        min_complexity: 0.0
+        max_complexity: 0.7
+    fallback: "claude-3-haiku-20240307"
+
+  validation:
+    models:
+      - name: "claude-3-sonnet-20240229"
+        min_complexity: 0.0
+        max_complexity: 1.0
+      - name: "gpt-4"
+        min_complexity: 0.0
+        max_complexity: 1.0
+    fallback: "claude-3-haiku-20240307"
+
+  feature_engineering:
+    models:
+      - name: "claude-3-haiku-20240307"
+        min_complexity: 0.0
+        max_complexity: 0.8
+      - name: "gemini-1.5-pro"
+        min_complexity: 0.0
+        max_complexity: 0.6
+    fallback: "claude-3-sonnet-20240229"
+
+  initial_screening:
+    models:
+      - name: "gemini-1.5-flash"
+        min_complexity: 0.0
+        max_complexity: 0.5
+      - name: "claude-3-haiku-20240307"
+        min_complexity: 0.4
+        max_complexity: 0.8
+    fallback: "gemini-1.5-pro" 
